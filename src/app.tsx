@@ -12,6 +12,11 @@ type Product = {
   inStock: boolean;
 };
 
+type CartItem = Product & {
+  size: string;
+  quantity: number;
+};
+
 const initialProducts: Product[] = [
   {
     id: 1,
@@ -44,21 +49,32 @@ const initialProducts: Product[] = [
 
 export default function App() {
   const [page, setPage] = useState("shop");
-  const [cart, setCart] = useState<Product[]>([]);
   const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [activeImage, setActiveImage] = useState(0);
+  const [selectedSize, setSelectedSize] = useState("S");
+  const [quantity, setQuantity] = useState(1);
 
-  const selectedProduct = products.find(p => p.id === selectedProductId) || null;
+  const selectedProduct =
+    products.find(p => p.id === selectedProductId) || null;
 
   useEffect(() => {
     setActiveImage(0);
+    setSelectedSize("S");
+    setQuantity(1);
   }, [selectedProductId]);
 
   const addToCart = (product: Product) => {
     if (!product.inStock || product.stock < 1) return;
 
-    setCart(prev => [...prev, product]);
+    const item: CartItem = {
+      ...product,
+      size: selectedSize,
+      quantity
+    };
+
+    setCart(prev => [...prev, item]);
 
     setProducts(prev =>
       prev.map(p =>
@@ -89,7 +105,12 @@ export default function App() {
     );
   };
 
-  const total = cart.reduce((sum, item) => sum + item.price, 0);
+  const anyOutOfStock = cart.some(item => !item.inStock);
+
+  const total = cart.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
 
   return (
     <div style={{ minHeight: "100vh", background: "black", color: "white", padding: 24 }}>
@@ -98,15 +119,26 @@ export default function App() {
       {page === "shop" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 20 }}>
           {products.map(p => (
-            <div key={p.id} style={{ border: "1px solid #333", padding: 16 }}>
+            <div key={p.id} style={{ border: "1px solid #333", padding: 16, position: "relative" }}>
+              {!p.inStock && (
+                <div style={{
+                  position: "absolute",
+                  top: 10,
+                  left: 10,
+                  background: "red",
+                  color: "white",
+                  padding: "4px 10px",
+                  fontSize: 12
+                }}>
+                  OUT OF STOCK
+                </div>
+              )}
+
               <img src={p.images[0]} style={{ width: "100%", background: "white" }} />
               <h3>{p.name}</h3>
               <p>{formatGBP(p.price)}</p>
-              <p style={{ color: p.inStock ? "lime" : "red" }}>
-                {p.inStock ? "In Stock" : "Out of Stock"}
-              </p>
+
               <button
-                disabled={!p.inStock}
                 onClick={() => {
                   setSelectedProductId(p.id);
                   setPage("product");
@@ -123,66 +155,3 @@ export default function App() {
         <div>
           <button onClick={() => setPage("shop")}>← Back</button>
           <h2>{selectedProduct.name}</h2>
-
-          <img
-            src={selectedProduct.images[activeImage]}
-            style={{ width: 300, background: "white" }}
-          />
-
-          <div>
-            {selectedProduct.images.map((img, i) => (
-              <img
-                key={i}
-                src={img}
-                onClick={() => setActiveImage(i)}
-                style={{
-                  width: 60,
-                  margin: 6,
-                  cursor: "pointer",
-                  border: i === activeImage ? "2px solid white" : "1px solid #333"
-                }}
-              />
-            ))}
-          </div>
-
-          <p>{selectedProduct.description}</p>
-          <p>{formatGBP(selectedProduct.price)}</p>
-
-          <button
-            disabled={!selectedProduct.inStock}
-            onClick={() => addToCart(selectedProduct)}
-          >
-            Add to Cart
-          </button>
-
-          <button onClick={() => toggleStock(selectedProduct.id)}>
-            Toggle Stock
-          </button>
-        </div>
-      )}
-
-      {page === "cart" && (
-        <div>
-          <h2>Cart</h2>
-
-          {cart.length === 0 && <p>Your cart is empty.</p>}
-
-          {cart.map(item => (
-            <div key={item.id}>
-              <p>{item.name}</p>
-              <p>{formatGBP(item.price)}</p>
-              <button onClick={() => removeFromCart(item.id)}>Remove</button>
-            </div>
-          ))}
-
-          <h3>Total: {formatGBP(total)}</h3>
-          <p>Support: sebskull5@gmail.com</p>
-
-          <button onClick={() => alert("Stripe checkout goes here")}>
-            Checkout (GBP)
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
